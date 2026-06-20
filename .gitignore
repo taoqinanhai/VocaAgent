@@ -22,6 +22,12 @@ venv/
 *.swp
 *.swo
 
+# 构建产物
+frontend/dist/
+
+# Excel 数据文件
+*.xls
+
 # 上传文件
 backend/uploads/
 
