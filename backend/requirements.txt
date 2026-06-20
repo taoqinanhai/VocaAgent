@@ -9,3 +9,4 @@ pymysql
 fpdf
 werkzeug
 pandas
+xlrd
