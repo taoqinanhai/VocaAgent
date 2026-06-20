@@ -1,0 +1,30 @@
+# 环境变量（含 API Key / 数据库密码）
+.env
+*.env
+.env.*
+!.env.example
+
+# 依赖
+node_modules/
+frontend/node_modules/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+venv/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 上传文件
+backend/uploads/
+
+# OS
+.DS_Store
+Thumbs.db

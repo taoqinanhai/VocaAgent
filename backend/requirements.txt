@@ -1,0 +1,11 @@
+Flask
+Flask-CORS
+python-dotenv
+dashscope
+PyPDF2
+pdfplumber
+python-docx
+pymysql
+fpdf
+werkzeug
+pandas
