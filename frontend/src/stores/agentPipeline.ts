@@ -1,8 +1,8 @@
 /**
  * Agent Pipeline Store — 跨页面数据总线
  *
- * 管理 3 个 Agent 的流式调用和结果共享：
- *   Agent A（Profile） → Agent B（Matching） → Agent C（Report）
+ * 管理 5 个 Agent 的流式调用和结果共享：
+ *   Agent A（Profile） → Agent B（Matching） → Agent C（Job Profile） → Agent D（Report） → Agent E（Interview）
  *
  * 页面间数据流动：
  *   Profile.vue  → 调 runProfile()    → 写入 store.profile

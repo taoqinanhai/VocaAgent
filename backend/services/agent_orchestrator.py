@@ -1,9 +1,11 @@
 """
-Agent 编排服务：封装 3 个 Agent 的流式调用逻辑
+Agent 编排服务：封装 5 个 Agent 的流式调用逻辑
 
 Agent A (简历解析)  → 学生能力画像 (JSON)
 Agent B (岗位匹配)  → 岗位匹配结果 (JSON, 流式渐进渲染)
-Agent C (报告生成)  → 职业规划报告 (HTML)
+Agent C (岗位画像)  → 单岗位深度分析 (JSON, 按需触发, per student×job)
+Agent D (报告生成)  → 职业规划报告 (HTML)
+Agent E (大佬访谈)  → 虚拟行业大佬 1v1 对话 (SSE 流式)
 """
 
 import json
@@ -13,7 +15,7 @@ from dashscope import Application
 from config.settings import API_KEY, APP_ID_A, APP_ID_B, APP_ID_C, APP_ID_D, APP_ID_E, KNOWLEDGE_BASE_IDS
 
 # ============================================================
-# System Prompts — 3 个 Agent 的核心提示词
+# System Prompts — 5 个 Agent 的核心提示词
 # 这些 Prompt 也应在百炼平台的应用配置中粘贴
 # ============================================================
 
@@ -380,7 +382,7 @@ SYSTEM_PROMPT_E = """你是一位在特定行业干了 12 年的老炮，现在�
 # ============================================================
 
 class AgentOrchestrator:
-    """三个 Agent 的编排调用器"""
+    """五个 Agent 的编排调用器"""
 
     def __init__(self, api_key=None):
         self.api_key = api_key or API_KEY

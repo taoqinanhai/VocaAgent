@@ -1,7 +1,7 @@
 """
 简历解析服务：从 Agent A 的 JSON 响应中提取学生画像并存入数据库
 
-适配新的 3-Agent 架构 — Agent A 只输出画像数据
+适配新的 5-Agent 架构 — Agent A 只输出画像数据
 (resume_detail_info + ability_dimension_scores + ability_overall_scores)
 """
 import re

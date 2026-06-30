@@ -385,6 +385,89 @@ const exportPDF = () => {
   background: rgba(255,255,255,0.2);
 }
 
+/* ========== Agent D 输出 class 样式 ========== */
+
+/* 报告分区卡片 */
+.report-html :deep(.report-section) {
+  margin-bottom: 36px;
+  padding: 32px;
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+}
+
+.report-html :deep(.report-section h2) {
+  font-size: 21px;
+  color: #3730a3;
+  border-left: 4px solid #667eea;
+  padding-left: 14px;
+  margin-bottom: 22px;
+  font-weight: 700;
+}
+
+/* 子分区 */
+.report-html :deep(.sub-section) {
+  margin-bottom: 24px;
+}
+
+.report-html :deep(.sub-section h3) {
+  font-size: 18px;
+  color: #4f46e5;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+.report-html :deep(.sub-section h4) {
+  font-size: 16px;
+  color: #374151;
+  margin: 14px 0 8px;
+  font-weight: 600;
+}
+
+/* 内容区 */
+.report-html :deep(.content) {
+  color: #4a5568;
+  line-height: 1.9;
+}
+
+/* 时间线 —— 职业发展路径 */
+.report-html :deep(.path-timeline) {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.report-html :deep(.path-item) {
+  padding: 18px 20px;
+  background: linear-gradient(135deg, rgba(238, 242, 255, 0.7) 0%, rgba(224, 231, 255, 0.5) 100%);
+  border-radius: 10px;
+  border-left: 3px solid #667eea;
+}
+
+.report-html :deep(.path-item h4) {
+  color: #3730a3;
+  font-size: 15px;
+  margin: 0 0 6px 0;
+}
+
+/* 行动计划阶段卡片 */
+.report-html :deep(.plan-phase) {
+  padding: 16px 20px;
+  margin-bottom: 14px;
+  background: rgba(248, 250, 252, 0.8);
+  border-radius: 10px;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.report-html :deep(.plan-phase h4) {
+  color: #667eea;
+  font-size: 15px;
+  margin: 0 0 6px 0;
+}
+
 /* ==================== 骨架屏 ==================== */
 .skeleton-panel {
   padding: 40px;

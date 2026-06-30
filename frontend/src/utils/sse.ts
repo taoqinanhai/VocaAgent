@@ -1,7 +1,7 @@
 /**
  * SSE (Server-Sent Events) 流式客户端
  *
- * 基于 fetch + ReadableStream，用于接收后端 3 个 Agent 的流式响应。
+ * 基于 fetch + ReadableStream，用于接收后端 5 个 Agent 的流式响应。
  * 支持：逐 chunk 回调、完成回调、错误回调、中断控制。
  *
  * 使用示例：

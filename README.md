@@ -1,13 +1,12 @@
 # VocaAgent-2.0
 
-AI 职业规划平台 — 基于阿里云百炼 DashScope 的 4-Agent 流水线系统。
+AI 职业规划平台 — 基于阿里云百炼 DashScope 的 5-Agent 流水线系统。
 
 ## 快速开始
 
 ### 1. 克隆仓库
 
 ```bash
-git clone https://github.com/taoqinanhai/VocaAgent.git
 cd VocaAgent
 ```
 

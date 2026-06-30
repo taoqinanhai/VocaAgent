@@ -9,7 +9,13 @@ from .jobs import jobs_bp
 from .resumes import resumes_bp
 from .reports import reports_bp
 from .admin import admin_bp
-from .agent import agent_bp
+
+# Agent Pipeline：按 Agent 拆分为 5 个独立 Blueprint
+from .agent_a import agent_a_bp
+from .agent_b import agent_b_bp
+from .agent_c import agent_c_bp
+from .agent_d import agent_d_bp
+from .agent_e import agent_e_bp
 
 
 def register_routes(app):
@@ -21,4 +27,10 @@ def register_routes(app):
     app.register_blueprint(resumes_bp)
     app.register_blueprint(reports_bp)
     app.register_blueprint(admin_bp)
-    app.register_blueprint(agent_bp)
+
+    # Agent Pipeline（5 个独立 Blueprint，URL 路径不变）
+    app.register_blueprint(agent_a_bp)
+    app.register_blueprint(agent_b_bp)
+    app.register_blueprint(agent_c_bp)
+    app.register_blueprint(agent_d_bp)
+    app.register_blueprint(agent_e_bp)
