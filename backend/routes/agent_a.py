@@ -46,8 +46,12 @@ def agent_profile():
             file.save(filepath)
             resume_text = extract_file_content(filepath)
 
-            if not resume_text:
-                return jsonify({"error": "无法从文件中提取文本内容"}), 400
+            if not resume_text or len(resume_text.strip()) < 30:
+                return jsonify({
+                    "error": "无法从文件中提取有效文本内容。"
+                             "如果您的PDF是扫描图片，请确保图片清晰可读；"
+                             "如果是文字型PDF，请确认文件未加密或损坏。"
+                }), 400
 
         elif content_type.startswith('application/json'):
             data = request.get_json()

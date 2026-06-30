@@ -18,4 +18,7 @@ app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 register_routes(app)
 
 if __name__ == '__main__':
+    from utils.file_processor import is_ocr_available
+    ocr_status = "可用" if is_ocr_available() else "不可用（仅支持文字型 PDF）"
+    print(f"[app] OCR 状态: {ocr_status}")
     app.run(debug=True, host='0.0.0.0', port=5000)

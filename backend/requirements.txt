@@ -10,3 +10,5 @@ fpdf
 werkzeug
 pandas
 xlrd
+PyMuPDF
+pytesseract

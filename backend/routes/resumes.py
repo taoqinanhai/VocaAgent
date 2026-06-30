@@ -50,6 +50,9 @@ def upload_resume():
 
             resume_text = extract_file_content(file_path)
 
+            if not resume_text:
+                return jsonify({"error": "无法从上传的简历文件中提取文本内容，请确认文件格式正确"}), 400
+
             if not resume_name:
                 resume_name = original_filename.rsplit('.', 1)[0]
 

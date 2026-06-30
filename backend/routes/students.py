@@ -75,6 +75,9 @@ def parse_resume():
 
             file_content = extract_file_content(filepath)
 
+            if not file_content:
+                return jsonify({"error": "无法从简历文件中提取文本内容，请确认文件格式正确"}), 400
+
             prompt = f"""请分析以下简历内容，返回JSON格式结果。
 
 简历内容：
