@@ -57,6 +57,11 @@ export interface StudentProfile {
     profile_completeness: number
     competitiveness_score: number
   }
+  /** Agent A 输出的技能熟练度详情（0-5分），用于后端技能差距分析 */
+  skill_details?: Array<{
+    name: string
+    proficiency: number
+  }>
 }
 
 export interface JobMatchResult {

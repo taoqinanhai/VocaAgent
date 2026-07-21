@@ -33,16 +33,16 @@ def get_jobs():
                         skills.append(skill)
 
             vertical_promotion_info = None
-            if job.get('complete_promotion_path'):
+            if job.get('promotion_path'):
                 try:
                     vertical_promotion_info = json.loads(job['complete_promotion_path']) if isinstance(job['complete_promotion_path'], str) else job['complete_promotion_path']
                 except:
                     vertical_promotion_info = []
 
             transfer_paths_info = None
-            if job.get('transfer_paths'):
+            if job.get('transfer_path'):
                 try:
-                    transfer_paths_info = json.loads(job['transfer_paths']) if isinstance(job['transfer_paths'], str) else job['transfer_paths']
+                    transfer_paths_info = json.loads(job['transfer_path']) if isinstance(job['transfer_path'], str) else job['transfer_path']
                 except:
                     transfer_paths_info = []
 

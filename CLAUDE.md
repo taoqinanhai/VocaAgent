@@ -55,7 +55,7 @@ Agent B (10岗位匹配分：id + 4维度分 + 综合分)  ← 轻量，必跑
 
 - **后端**：Flask 正常运行，5 个 Agent 全部联通，Agent E 已测试通过（2026-06-20）
 - **前端**：Vite dev 正常，全部路由就绪（含 Interview 页），Vue 3 + Element Plus + ECharts
-- **数据库**：12 张表，MySQL 本地 `vocaagent`
+- **数据库**：14 张表，MySQL 本地 `vocaagent`
 - **待处理**：无阻塞项（Agent E 已完成并测试通过）
 
 ## 修改日志
@@ -273,7 +273,7 @@ frontend/
 
 ---
 
-## 数据库（12 张表）
+## 数据库（14 张表）
 
 | 表名 | 说明 | 关键字段 |
 |------|------|----------|
@@ -289,6 +289,7 @@ frontend/
 | `resumes` | 简历文件管理 | user_id, original_filename, file_path, resume_text, is_default |
 | `resume_analyses` | 简历 AI 分析记录 | resume_id, analysis_type, analysis_content(JSON), ability_scores(JSON) |
 | `resume_job_matches` | 简历-岗位匹配记录 | resume_id, job_id, match_score, UNIQUE(resume_id, job_id) |
+| `job_skill_requirements` | ★ 岗位技能需求配方（关键词提取） | job_id, skill_name, weight, required_level, INDEX(job_id), INDEX(skill_name) |
 
 ---
 

@@ -6,7 +6,8 @@ import datetime
 from flask import Blueprint, request, jsonify, Response, stream_with_context
 from services.agent_orchestrator import orchestrator
 from utils.db import get_db_connection
-from .agent_utils import _extract_json
+from utils.skill_analyzer import analyze_skill_gap, format_gap_for_prompt
+from .agent_utils import _extract_json, build_job_context, JOB_CONTEXT_COLUMNS
 
 agent_c_bp = Blueprint('agent_c', __name__)
 
@@ -32,9 +33,6 @@ def agent_job_profile():
             return jsonify({"error": "请求数据不能为空"}), 400
 
         job_id = data.get('job_id')
-        job_name = data.get('job_name', '')
-        job_description = data.get('job_description', '')
-        industry = data.get('industry', '')
         student_profile = data.get('student_profile')
         req_student_id = data.get('student_id')
 
@@ -43,17 +41,36 @@ def agent_job_profile():
         if not job_id:
             return jsonify({"error": "岗位ID不能为空"}), 400
 
-        job_info = {
-            'id': job_id,
-            'job_name': job_name,
-            'job_description': job_description,
-            'industry': industry
-        }
+        # 从 DB 查完整的岗位上下文（不再依赖前端只传 4 个残缺字段）
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            f"SELECT {JOB_CONTEXT_COLUMNS} FROM jobs WHERE id = %s",
+            (job_id,)
+        )
+        job_row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+
+        if not job_row:
+            return jsonify({"error": "岗位不存在"}), 404
+
+        job_info = build_job_context(job_row)
         student_profile_str = json.dumps(student_profile, ensure_ascii=False, indent=2)
+
+        # ---- 规则引擎预计算：技能差距分析 ----
+        skill_details = student_profile.get('skill_details', [])
+        skill_gap_text = None
+        if skill_details and job_id:
+            try:
+                gap = analyze_skill_gap(skill_details, job_id)
+                skill_gap_text = format_gap_for_prompt(gap)
+            except Exception:
+                pass  # 差距分析失败不阻塞主流程
 
         def generate():
             full_response = ""
-            for event in orchestrator.run_agent_c(job_info, student_profile_str):
+            for event in orchestrator.run_agent_c(job_info, student_profile_str, skill_gap_text):
                 if event["type"] == "chunk":
                     full_response += event["content"]
                     yield f"data: {json.dumps({'type': 'chunk', 'content': event['content']}, ensure_ascii=False)}\n\n"

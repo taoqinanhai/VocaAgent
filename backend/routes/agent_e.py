@@ -8,6 +8,8 @@ import datetime
 from flask import Blueprint, request, jsonify, Response, stream_with_context
 from services.agent_orchestrator import orchestrator
 from utils.db import get_db_connection
+from utils.skill_analyzer import analyze_skill_gap, format_gap_for_prompt
+from .agent_utils import build_job_context, JOB_CONTEXT_COLUMNS
 
 agent_e_bp = Blueprint('agent_e', __name__)
 
@@ -90,24 +92,17 @@ def agent_interview():
             }
 
         # 2. 查岗位详情
-        cursor.execute("""
-            SELECT id, job_name, company_name, salary_range, industry, job_description
-            FROM jobs WHERE id = %s
-        """, (job_id,))
+        cursor.execute(
+            f"SELECT {JOB_CONTEXT_COLUMNS} FROM jobs WHERE id = %s",
+            (job_id,)
+        )
         job = cursor.fetchone()
         if not job:
             cursor.close()
             conn.close()
             return jsonify({"error": "岗位不存在"}), 404
 
-        job_info = {
-            'id': job['id'],
-            'job_name': job['job_name'],
-            'company_name': job.get('company_name', '') or '',
-            'salary_range': job.get('salary_range', '') or '',
-            'industry': job.get('industry', '') or '',
-            'job_description': job.get('job_description', '') or '',
-        }
+        job_info = build_job_context(job)
 
         # 3. 查 Agent C 岗位 AI 画像（自动串联：未命中则同步调 Agent C）
         cursor.execute("""
@@ -185,6 +180,16 @@ def agent_interview():
 
         student_profile_str = json.dumps(student_profile, ensure_ascii=False)
 
+        # ---- 规则引擎预计算：技能差距分析 ----
+        skill_details = student_profile.get('skill_details', [])
+        skill_gap_text = None
+        if skill_details and job_id:
+            try:
+                gap = analyze_skill_gap(skill_details, job_id)
+                skill_gap_text = format_gap_for_prompt(gap)
+            except Exception:
+                pass  # 差距分析失败不阻塞主流程
+
         def generate():
             nonlocal chat_history
 
@@ -196,7 +201,7 @@ def agent_interview():
             full_response = ""
             for event in orchestrator.run_agent_e(
                 student_profile_str, job_info, agent_c_data,
-                chat_history, message
+                chat_history, message, skill_gap_text
             ):
                 if event["type"] == "chunk":
                     full_response += event["content"]

@@ -9,7 +9,8 @@ from flask import Blueprint, request, jsonify, Response, stream_with_context
 from services.agent_orchestrator import orchestrator
 from utils.db import get_db_connection
 from utils.auth import get_current_user
-from .agent_utils import _extract_json, _validate_report_html, _extract_career_fields
+from utils.skill_analyzer import analyze_skill_gap, format_gap_for_prompt
+from .agent_utils import _extract_json, _validate_report_html, _extract_career_fields, build_job_context, JOB_CONTEXT_COLUMNS
 
 agent_d_bp = Blueprint('agent_d', __name__)
 
@@ -70,6 +71,50 @@ def agent_report():
         student_profile_str = json.dumps(student_profile, ensure_ascii=False, indent=2)
         top3_matches_str = json.dumps(top3_matches, ensure_ascii=False, indent=2)
 
+        # ---- 规则引擎预计算：技能差距分析 ----
+        skill_details = student_profile.get('skill_details', [])
+        skill_gap_text = None
+        if skill_details and req_target_job_id:
+            try:
+                gap = analyze_skill_gap(skill_details, req_target_job_id)
+                skill_gap_text = format_gap_for_prompt(gap)
+            except Exception:
+                pass  # 差距分析失败不阻塞主流程
+
+        # ---- 补全 top3_matches：DB 批量查询，把岗位名/公司名拼进去 ----
+        enriched_matches = list(top3_matches) if isinstance(top3_matches, list) else []
+        if enriched_matches:
+            try:
+                match_ids = [
+                    m.get('job_id') or m.get('id')
+                    for m in enriched_matches
+                    if (m.get('job_id') or m.get('id'))
+                ]
+                if match_ids:
+                    conn_enrich = get_db_connection()
+                    cur_enrich = conn_enrich.cursor()
+                    placeholders = ','.join(['%s'] * len(match_ids))
+                    cur_enrich.execute(
+                        f"SELECT id, job_name, company_name FROM jobs WHERE id IN ({placeholders})",
+                        match_ids
+                    )
+                    id_to_info = {}
+                    for row in cur_enrich.fetchall():
+                        id_to_info[row['id']] = {
+                            'job_name': row['job_name'],
+                            'company_name': row.get('company_name', ''),
+                        }
+                    cur_enrich.close()
+                    conn_enrich.close()
+                    for m in enriched_matches:
+                        mid = m.get('job_id') or m.get('id')
+                        if mid and mid in id_to_info:
+                            m['job_name'] = id_to_info[mid]['job_name']
+                            m['company_name'] = id_to_info[mid]['company_name']
+            except Exception:
+                pass  # 补全失败不阻塞主流程
+        top3_matches_str = json.dumps(enriched_matches, ensure_ascii=False, indent=2)
+
         def generate():
             # ---- 0. 提前解析 student_id（Agent C 需要用到）----
             student_id = req_student_id
@@ -98,7 +143,7 @@ def agent_report():
                     conn_job = get_db_connection()
                     cur_job = conn_job.cursor()
                     cur_job.execute(
-                        "SELECT job_name, job_description, industry FROM jobs WHERE id = %s",
+                        f"SELECT {JOB_CONTEXT_COLUMNS} FROM jobs WHERE id = %s",
                         (req_target_job_id,)
                     )
                     job_row = cur_job.fetchone()
@@ -107,6 +152,7 @@ def agent_report():
 
                     if job_row and job_row['job_name']:
                         target_job_name = job_row['job_name']
+                        target_job_context = build_job_context(job_row)
 
                         # ① 查 job_ai_profiles 缓存
                         if student_id:
@@ -147,13 +193,7 @@ def agent_report():
                         # ② 缓存未命中 → 自动调 Agent C
                         if not agent_c_data and student_id:
                             yield f"data: {json.dumps({'type': 'status', 'message': '正在分析目标岗位需求…'}, ensure_ascii=False)}\n\n"
-                            job_info = {
-                                'id': req_target_job_id,
-                                'job_name': target_job_name,
-                                'job_description': job_row['job_description'] or '',
-                                'industry': job_row['industry'] or ''
-                            }
-                            parsed = orchestrator.run_agent_c_sync(job_info, student_profile_str)
+                            parsed = orchestrator.run_agent_c_sync(target_job_context, student_profile_str)
                             if parsed:
                                 agent_c_data = {
                                     'job_name': target_job_name,
@@ -195,7 +235,7 @@ def agent_report():
 
             # ---- 2. Agent D：生成报告 ----
             full_response = ""
-            for event in orchestrator.run_agent_d(student_profile_str, top3_matches_str, agent_c_data):
+            for event in orchestrator.run_agent_d(student_profile_str, top3_matches_str, agent_c_data, skill_gap_text):
                 if event["type"] == "chunk":
                     full_response += event["content"]
                     yield f"data: {json.dumps({'type': 'chunk', 'content': event['content']}, ensure_ascii=False)}\n\n"

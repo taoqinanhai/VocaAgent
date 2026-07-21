@@ -127,3 +127,38 @@ def _extract_career_fields(html: str) -> dict:
         'staged_growth_plan': _extract_subsection('action-plan', r'1\.\s*分阶段成长计划'),
         'dynamic_evaluation_mechanism': _extract_subsection('action-plan', r'2\.\s*动态评估机制'),
     }
+
+
+def build_job_context(job_row: dict) -> dict:
+    """
+    从 DB 行构建统一的岗位上下文，供所有 Agent（B/C/D/E）使用。
+
+    确保每个 Agent 看到的岗位数据一致，避免「Agent E 传了公司名但 B 没传」的问题。
+
+    Args:
+        job_row: pymysql 查询返回的 dict（至少包含 jobs 表核心列）
+
+    Returns:
+        {id, job_name, industry, job_description, company_name, salary_range,
+         work_address, company_size, company_type, company_description}
+    """
+    return {
+        'id': job_row['id'],
+        'job_name': job_row.get('job_name', ''),
+        'industry': job_row.get('industry', ''),
+        'job_description': job_row.get('job_description', ''),
+        'company_name': job_row.get('company_name', ''),
+        'salary_range': job_row.get('salary_range', ''),
+        'work_address': job_row.get('work_address', ''),
+        'company_size': job_row.get('company_size', ''),
+        'company_type': job_row.get('company_type', ''),
+        'company_description': job_row.get('company_description', ''),
+    }
+
+
+# 所有 Agent 共用的岗位 SQL 查询列
+JOB_CONTEXT_COLUMNS = (
+    "id, job_name, industry, job_description, "
+    "company_name, salary_range, work_address, "
+    "company_size, company_type, company_description"
+)

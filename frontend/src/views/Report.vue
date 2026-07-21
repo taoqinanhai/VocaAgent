@@ -40,7 +40,7 @@
               <el-form-item label="选择岗位">
                 <el-select
                   v-model="reportForm.jobId"
-                  placeholder="请先选择学生"
+                  placeholder="请先选择岗位"
                   style="width: 100%"
                   class="glass-select"
                   :disabled="!reportForm.studentId || matchJobs.length === 0"
@@ -340,7 +340,10 @@ const onStudentChange = async (studentId: number | null) => {
   try {
     const res = await axios.get(`/api/agent/match/${studentId}`)
     if (res.data.exists && res.data.data?.length > 0) {
-      matchJobs.value = res.data.data
+      // 按匹配度从高到低排序（DB 中的 match_rank 是 LLM 输出顺序，不可靠）
+      matchJobs.value = [...res.data.data].sort(
+        (a, b) => (b.overall_match_score || 0) - (a.overall_match_score || 0)
+      )
     } else {
       ElMessage.warning('该学生尚未完成岗位匹配，请先在"岗位匹配"页面生成匹配结果')
     }
@@ -857,9 +860,11 @@ const deleteReport = async (reportId: number) => {
   background: rgba(255, 255, 255, 0.5) !important;
   border: 1px solid rgba(255, 255, 255, 0.8) !important;
   color: #4b5563 !important;
-  border-radius: 10px !important;
+  border-radius: 14px !important;
   font-weight: 600 !important;
   padding: 8px 16px !important;
+  height: 50px;
+  font-size: 16px;
 }
 .glass-btn-small:hover {
   background: rgba(255, 255, 255, 0.9) !important;

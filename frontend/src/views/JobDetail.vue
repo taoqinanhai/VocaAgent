@@ -107,13 +107,34 @@
             <h2 class="header-title">岗位能力画像分析</h2>
           </div>
           
-          <!-- AI 正在流式生成中 -->
-          <div v-if="aiProfileLoading" class="glass-inner-panel" style="margin: 0 36px 24px; padding: 16px 24px; display: flex; align-items: center; gap: 12px;">
-            <el-icon class="is-loading" :size="18"><Loading /></el-icon>
-            <span style="color: #667eea; font-weight: 600;">AI 正在分析岗位画像...</span>
+          <!-- AI 正在流式生成中 — 动态状态提示 -->
+          <div v-if="aiProfileLoading" class="ai-loading-overlay">
+            <div class="ai-loading-card">
+              <div class="ai-loading-icon">
+                <el-icon class="is-loading" :size="32"><Loading /></el-icon>
+              </div>
+              <h3 class="ai-loading-title">AI 正在分析岗位画像</h3>
+              <p class="ai-loading-status">{{ loadingStatus }}</p>
+              <div class="ai-loading-steps">
+                <div class="step" :class="{ active: loadingStep >= 1, done: loadingStep > 1 }">
+                  <span class="step-dot"></span>
+                  <span class="step-label">分析能力要求</span>
+                </div>
+                <div class="step" :class="{ active: loadingStep >= 2, done: loadingStep > 2 }">
+                  <span class="step-dot"></span>
+                  <span class="step-label">规划晋升路径</span>
+                </div>
+                <div class="step" :class="{ active: loadingStep >= 3, done: loadingStep > 3 }">
+                  <span class="step-dot"></span>
+                  <span class="step-label">分析换岗方向</span>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <el-row :gutter="32">
+          <!-- 画像内容 — 生成完成后才显示 -->
+          <template v-if="!aiProfileLoading">
+            <el-row :gutter="32">
             <el-col :xs="24" :lg="24">
               <!-- 能力雷达图 -->
               <div class="radar-chart glass-inner-panel">
@@ -212,9 +233,10 @@
               </div>
             </el-col>
           </el-row>
+          </template>
         </div>
       </div>
-      
+
       <!-- 骨架屏 (毛玻璃适配) -->
       <div v-else class="glass-panel skeleton-panel fade-in-up">
         <el-skeleton :rows="12" animated class="glass-skeleton" />
@@ -305,6 +327,8 @@ const careerPaths = ref<any>({
 // ---- Agent C 状态 (单岗位 AI 画像，按需触发) ----
 const aiProfileLoading = ref(false)
 const aiProfileExists = ref(false)
+const loadingStatus = ref('正在连接 AI 服务...')
+const loadingStep = ref(0)  // 0=初始, 1=分析能力, 2=晋升路径, 3=换岗方向
 const studentId = ref<number | null>(null)
 
 const hasStudentContext = computed(() => !!route.query.studentId)
@@ -586,14 +610,10 @@ const loadJobDetail = async () => {
   try {
     let basicResponse
     const studentId = route.query.studentId
-    const matchRank = route.query.matchRank
-    
-    if (studentId && matchRank) {
-      const apiUrl = `http://localhost:5000/api/students/${studentId}/matches/${matchRank}/job`
-      basicResponse = await axios.get(apiUrl)
-    } else {
-      basicResponse = await axios.get(`http://localhost:5000/api/jobs/${jobId.value}`)
-    }
+
+    // 始终用 job_id 查岗位，不依赖 matchRank（DB 中的 match_rank 是 LLM 输出顺序，
+    // 前端传的 matchRank 是按分数排序后的显示顺序，两者可能不一致导致查出错岗位）
+    basicResponse = await axios.get(`http://localhost:5000/api/jobs/${jobId.value}`)
     
     const processValue = (value) => {
       return value === 'nan' || value === null || value === undefined ? '无' : value
@@ -693,6 +713,8 @@ const triggerAgentC = async () => {
   if (!studentId || !job.value) return
 
   aiProfileLoading.value = true
+  loadingStatus.value = '正在连接 AI 服务...'
+  loadingStep.value = 0
 
   // 获取学生画像
   let profile = agentPipeline.profile
@@ -752,6 +774,17 @@ const triggerAgentC = async () => {
             const sseEvent = JSON.parse(line.trim().slice(6))
             if (sseEvent.type === 'chunk' && sseEvent.content) {
               fullText += sseEvent.content
+              // 根据已生成的内容推断当前步骤
+              if (fullText.includes('"job_transfer_paths"')) {
+                loadingStatus.value = '正在分析横向换岗方向...'
+                loadingStep.value = 3
+              } else if (fullText.includes('"vertical_promotion_info"')) {
+                loadingStatus.value = '正在规划纵向晋升路径...'
+                loadingStep.value = 2
+              } else if (fullText.includes('"ability_requirement_scores"')) {
+                loadingStatus.value = '正在评估六维能力要求...'
+                loadingStep.value = 1
+              }
             } else if (sseEvent.type === 'error') {
               throw new Error(sseEvent.message || 'AI 服务错误')
             } else if (sseEvent.type === 'done') {
@@ -1314,6 +1347,90 @@ const handleBack = () => {
 .skeleton-panel {
   padding: 36px;
 }
+
+/* ==================== AI 加载状态 ==================== */
+.ai-loading-overlay {
+  margin: 0 36px 24px;
+  padding: 40px 24px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: rgba(255,255,255,0.15);
+  backdrop-filter: blur(12px);
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.3);
+}
+.ai-loading-card {
+  text-align: center;
+}
+.ai-loading-icon {
+  margin-bottom: 16px;
+  color: #667eea;
+}
+.ai-loading-title {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1f2937;
+}
+.ai-loading-status {
+  margin: 0 0 24px;
+  font-size: 14px;
+  color: #667eea;
+  animation: pulse-text 2s ease-in-out infinite;
+}
+.ai-loading-steps {
+  display: flex;
+  gap: 32px;
+  justify-content: center;
+}
+.ai-loading-steps .step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  opacity: 0.35;
+  transition: all 0.5s ease;
+}
+.ai-loading-steps .step.active {
+  opacity: 1;
+}
+.ai-loading-steps .step.done {
+  opacity: 0.6;
+}
+.ai-loading-steps .step .step-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #c0c4cc;
+  transition: all 0.5s ease;
+}
+.ai-loading-steps .step.active .step-dot {
+  background: #667eea;
+  box-shadow: 0 0 12px rgba(102, 126, 234, 0.6);
+  animation: pulse-dot 1s ease-in-out infinite;
+}
+.ai-loading-steps .step.done .step-dot {
+  background: #67c23a;
+}
+.ai-loading-steps .step .step-label {
+  font-size: 12px;
+  color: #6b7280;
+  white-space: nowrap;
+}
+.ai-loading-steps .step.active .step-label {
+  color: #667eea;
+  font-weight: 600;
+}
+@keyframes pulse-text {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 8px rgba(102, 126, 234, 0.4); }
+  50% { box-shadow: 0 0 20px rgba(102, 126, 234, 0.8); }
+}
+
 .glass-skeleton :deep(.el-skeleton__item) {
   background: linear-gradient(90deg, rgba(255,255,255,0.3) 25%, rgba(255,255,255,0.6) 37%, rgba(255,255,255,0.3) 63%);
   background-size: 400% 100%;

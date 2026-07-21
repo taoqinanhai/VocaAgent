@@ -56,7 +56,12 @@ SYSTEM_PROMPT_A = """你是一个专业的简历解析与人才评估专家。�
   "ability_overall_scores": {
     "profile_completeness": 85,
     "competitiveness_score": 72
-  }
+  },
+  "skill_details": [
+    {"name": "Java", "proficiency": 4.5},
+    {"name": "Spring Boot", "proficiency": 4.0},
+    {"name": "MySQL", "proficiency": 3.0}
+  ]
 }
 ```
 
@@ -99,6 +104,12 @@ SYSTEM_PROMPT_A = """你是一个专业的简历解析与人才评估专家。�
 **competitiveness_score（综合竞争力，0-100 整数）**：
 - 综合六个维度的得分、学历层次、学校水平、实习质量等因素
 - 70-100 → 竞争力强；40-69 → 中等；0-39 → 较弱
+
+**skill_details（技能熟练度，0-5 分，保留一位小数）**：
+- 从简历中提取每个技能的熟练度评分
+- 0-1 分 = 了解（仅提及或基础概念）；2-3 分 = 熟悉/熟练（能独立使用完成日常工作）；4-5 分 = 精通/专家（深入理解原理、有丰富项目经验）
+- 仅输出 professional_skills 中出现的技能，每个技能都要有 proficiency 评分
+- 评分要实事求是，不要全部给 4-5 分
 
 ## 约束规则
 
@@ -143,8 +154,8 @@ SYSTEM_PROMPT_B = """你是一个专业的岗位匹配专家。你会收到一�
 
 ## 约束规则
 
-1. 强制要求：岗位数量 = 10
-2. 匹配分要有区分度，不要全部 80-90 分
+1. 岗位数量 = 输入的岗位数（不要多也不要少）
+2. 匹配分要有区分度，不要全部 80-90 分；考虑公司、薪资、地点等因素
 3. 所有分析基于输入数据，不虚构
 4. 输出仅为 JSON，不要添加任何解释文字
 """
@@ -484,10 +495,15 @@ Required JSON format:
   "ability_overall_scores": {{
     "profile_completeness": 85,
     "competitiveness_score": 72
-  }}
+  }},
+  "skill_details": [
+    {{"name": "Java", "proficiency": 4.5}},
+    {{"name": "Spring Boot", "proficiency": 4.0}}
+  ]
 }}
 
 评分标准：专业能力/创新/学习/抗压/沟通/实习 六维各0-10分（一位小数）。完整度和竞争力各0-100整数。
+技能熟练度(skill_details) 0-5分一位小数：0-1=了解、2-3=熟悉/熟练、4-5=精通/专家，仅输出 professional_skills 中出现的技能。
 
 简历内容如下：
 {resume_text}"""
@@ -512,11 +528,21 @@ Required JSON format:
         """
         jobs_text = ""
         for job in job_descriptions:
+            # 拼接完整岗位信息（company_description 可能很长，限制 300 字）
+            company_desc = job.get('company_description', '') or ''
+            if len(company_desc) > 300:
+                company_desc = company_desc[:300] + '...'
             jobs_text += f"""
 ---
 岗位 ID: {job['id']}
 岗位名称: {job['job_name']}
+公司: {job.get('company_name', '未知')}
 行业: {job.get('industry', '未知')}
+薪资: {job.get('salary_range', '未知')}
+地点: {job.get('work_address', '未知')}
+公司规模: {job.get('company_size', '未知')}
+公司类型: {job.get('company_type', '未知')}
+公司介绍: {company_desc or '暂无'}
 岗位描述: {job.get('job_description', '暂无描述')}
 """
 
@@ -558,13 +584,18 @@ Required JSON format (恰好 {len(job_descriptions)} 个岗位):
     # Agent C：单岗位画像分析（按需触发）
     # ========================================================
 
-    def run_agent_c(self, job_info, student_profile_json):
+    def run_agent_c(self, job_info, student_profile_json, skill_gap_text=None):
         """
         输入：
           - job_info: dict with id, job_name, job_description, industry
           - student_profile_json: Agent A 输出的学生画像 JSON 字符串
+          - skill_gap_text: (可选) 技能差距分析文本，由 skill_analyzer 预计算
         输出：SSE 流 → ability_requirement_scores + vertical_promotion_info + job_transfer_paths
         """
+        gap_section = ""
+        if skill_gap_text:
+            gap_section = f"\n\n{skill_gap_text}\n"
+
         user_message = f"""你必须严格按照以下 JSON Schema 输出，字段名必须使用英文，不得使用中文键名，不得添加额外字段。仅输出 JSON，不要解释。
 
 Required JSON format:
@@ -593,12 +624,17 @@ ability_requirement_scores 每维 0-10 分（一位小数）。job_transfer_path
 
 岗位 ID: {job_info['id']}
 岗位名称: {job_info['job_name']}
+公司: {job_info.get('company_name', '未知')}
 行业: {job_info.get('industry', '未知')}
+薪资: {job_info.get('salary_range', '未知')}
+地点: {job_info.get('work_address', '未知')}
+公司规模: {job_info.get('company_size', '未知')}
+公司类型: {job_info.get('company_type', '未知')}
 岗位描述: {job_info.get('job_description', '暂无描述')}
 
 ## 学生能力画像（用于转岗路径分析时参考学生的可复用技能）
 
-{student_profile_json}"""
+{student_profile_json}{gap_section}"""
         return self._call_agent(
             app_id=self.app_ids['C'],
             system_prompt=SYSTEM_PROMPT_C,
@@ -656,13 +692,14 @@ ability_requirement_scores 每维 0-10 分（一位小数）。job_transfer_path
     # Agent D：报告生成 → 职业规划报告 HTML
     # ========================================================
 
-    def run_agent_d(self, student_profile_json, top3_matches_json, agent_c_data=None):
+    def run_agent_d(self, student_profile_json, top3_matches_json, agent_c_data=None, skill_gap_text=None):
         """
         输入：
           - student_profile_json: Agent A 输出的学生画像
           - top3_matches_json: Agent B 输出的 Top 3 匹配结果
           - agent_c_data: (可选) Agent C 输出的单岗位画像 dict，包含：
               ability_requirement_scores, vertical_promotion_info, job_transfer_paths, job_name
+          - skill_gap_text: (可选) 技能差距分析文本，由 skill_analyzer 预计算
         输出：SSE 流 → 最终累积为 HTML 报告
         """
         # 构建 Agent C 数据段（如果有）
@@ -689,6 +726,15 @@ ability_requirement_scores 每维 0-10 分（一位小数）。job_transfer_path
 - 在「一、人岗匹配综合分析」中，逐项对比学生六维分 vs 岗位要求分，量化差距
 - 在「二、职业发展路径」中，用 vertical_promotion_info.complete_promotion_path 作为真实晋升阶梯
 - 在「三、分阶段行动计划」末尾，增加「换岗备选方案」小节，列出 2-3 个相关方向及难度
+"""
+
+        # 构建技能差距段（独立于 Agent C 数据，若无 C 也单独注入）
+        gap_section = ""
+        if skill_gap_text:
+            gap_section = f"""
+{skill_gap_text}
+
+请将以上技能差距分析融入报告的「分阶段行动计划」中，把"加强技能学习"替换为针对具体缺失技能的、可量化的提升建议（如"2周内通过XX教程掌握Redis基础"）。
 """
 
         user_message = f"""你必须严格按照以下 HTML 格式输出职业发展报告，从 <div class="career-report"> 开始。每个板块都要有实质内容。
@@ -729,7 +775,7 @@ Required HTML structure:
 ## Top 3 岗位匹配结果
 
 {top3_matches_json}
-{c_section}"""
+{c_section}{gap_section}"""
         return self._call_agent(
             app_id=self.app_ids['D'],
             system_prompt=SYSTEM_PROMPT_D,
@@ -784,7 +830,7 @@ Required HTML structure:
 
     # ========================================================
 
-    def run_agent_e(self, student_profile_json, job_info, agent_c_data, chat_history, user_message_text):
+    def run_agent_e(self, student_profile_json, job_info, agent_c_data, chat_history, user_message_text, skill_gap_text=None):
         """
         输入：
           - student_profile_json: Agent A 输出的学生画像 JSON 字符串
@@ -792,6 +838,7 @@ Required HTML structure:
           - agent_c_data: Agent C 输出的岗位 AI 画像 dict（或 None）
           - chat_history: list of {role, content, time}，可能含 {"role":"summary"} 摘要
           - user_message_text: 用户当前发送的问题
+          - skill_gap_text: (可选) 技能差距分析文本，由 skill_analyzer 预计算
         输出：SSE 流 → "行业大佬"角色的回复文本
         """
         RECENT_MSG_COUNT = 6  # 保留最近 3 轮（6 条消息）
@@ -843,10 +890,19 @@ Required HTML structure:
 
 岗位名称: {job_info.get('job_name', '未知')}
 公司: {job_info.get('company_name', '未知')}
-薪资范围: {job_info.get('salary_range', '未知')}
 行业: {job_info.get('industry', '未知')}
+薪资: {job_info.get('salary_range', '未知')}
+地点: {job_info.get('work_address', '未知')}
+公司规模: {job_info.get('company_size', '未知')}
+公司类型: {job_info.get('company_type', '未知')}
 岗位描述: {job_info.get('job_description', '暂无描述')}
 {c_section}
+        """ + (f"""
+
+{skill_gap_text}
+
+（以上技能差距数据可作为你毒舌点评的弹药——直接指出学生缺什么技能、差距多大。）
+""" if skill_gap_text else "") + f"""
 {history_section}
 ## 学生最新问题
 

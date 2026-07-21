@@ -746,7 +746,12 @@ const goToReport = () => {
       },
     }))
   )
-  router.push('/report')
+  router.push({
+    path: '/report',
+    query: {
+      studentId: selectedStudent.value?.toString() || '',
+    }
+  })
 }
 
 onUnmounted(() => {

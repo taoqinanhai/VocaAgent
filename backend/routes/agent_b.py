@@ -7,7 +7,8 @@ from flask import Blueprint, request, jsonify, Response, stream_with_context
 from services.agent_orchestrator import orchestrator
 from utils.db import get_db_connection
 from utils.auth import get_current_user
-from .agent_utils import _extract_json
+from utils.skill_analyzer import select_top_jobs
+from .agent_utils import _extract_json, build_job_context, JOB_CONTEXT_COLUMNS
 
 agent_b_bp = Blueprint('agent_b', __name__)
 
@@ -39,35 +40,51 @@ def agent_match():
         current_user = get_current_user()
         req_user_id = current_user['id'] if current_user else 1
 
-        # 从 MySQL 获取岗位描述
+        # ---- 规则引擎粗筛：从全量岗位中选出 Top N ----
+        skill_details = student_profile.get('skill_details', [])
         conn = get_db_connection()
         cursor = conn.cursor()
 
         job_ids = data.get('job_ids')
         if job_ids and isinstance(job_ids, list):
+            # 用户指定了岗位范围，直接取全部
             placeholders = ','.join(['%s'] * len(job_ids))
-            query = f"SELECT id, job_name, industry, job_description FROM jobs WHERE id IN ({placeholders})"
-            cursor.execute(query, job_ids)
+            cursor.execute(
+                f"SELECT {JOB_CONTEXT_COLUMNS} FROM jobs WHERE id IN ({placeholders})",
+                job_ids
+            )
+            jobs_raw = cursor.fetchall()
+        elif skill_details:
+            # 有技能数据 → 规则引擎粗筛 Top 10
+            cursor.execute("SELECT id FROM jobs")
+            all_ids = [row['id'] for row in cursor.fetchall()]
+            top_jobs = select_top_jobs(skill_details, all_ids, top_n=10)
+            top_ids = [job_id for job_id, score in top_jobs]
+            if top_ids:
+                placeholders = ','.join(['%s'] * len(top_ids))
+                cursor.execute(
+                    f"SELECT {JOB_CONTEXT_COLUMNS} FROM jobs WHERE id IN ({placeholders})",
+                    top_ids
+                )
+                jobs_raw = cursor.fetchall()
+                # 按 select_top_jobs 的排序重排（SQL IN 不保序）
+                id_order = {jid: i for i, (jid, _) in enumerate(top_jobs)}
+                jobs_raw = sorted(jobs_raw, key=lambda j: id_order.get(j['id'], 999))
+            else:
+                jobs_raw = []
         else:
-            query = "SELECT id, job_name, industry, job_description FROM jobs LIMIT 10"
-            cursor.execute(query)
-
-        jobs = cursor.fetchall()
+            # 无 skill_details → 兜底：取前 10 条（按 ID 排序，保证确定性）
+            cursor.execute(
+                f"SELECT {JOB_CONTEXT_COLUMNS} FROM jobs ORDER BY id LIMIT 10"
+            )
+            jobs_raw = cursor.fetchall()
         cursor.close()
         conn.close()
 
-        if not jobs:
+        if not jobs_raw:
             return jsonify({"error": "数据库中没有岗位数据，请先导入岗位"}), 500
 
-        job_descriptions = [
-            {
-                'id': job['id'],
-                'job_name': job['job_name'],
-                'industry': job.get('industry', '未知'),
-                'job_description': job.get('job_description', '')
-            }
-            for job in jobs
-        ]
+        job_descriptions = [build_job_context(j) for j in jobs_raw]
 
         student_profile_str = json.dumps(student_profile, ensure_ascii=False, indent=2)
 

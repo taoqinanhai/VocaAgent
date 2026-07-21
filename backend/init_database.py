@@ -276,10 +276,25 @@ def create_tables():
     """)
     print("[OK] resume_job_matches")
 
+    # ===================== job_skill_requirements =====================
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS job_skill_requirements (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            job_id INT NOT NULL,
+            skill_name VARCHAR(100) NOT NULL,
+            weight FLOAT DEFAULT 0.1,
+            required_level FLOAT DEFAULT 3.0,
+            FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE,
+            INDEX idx_job_id (job_id),
+            INDEX idx_skill_name (skill_name)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    """)
+    print("[OK] job_skill_requirements")
+
     conn.commit()
     cursor.close()
     conn.close()
-    print("\n[OK] 12 张表已就绪！")
+    print("\n[OK] 14 张表已就绪！")
 
 
 def import_excel_data():
@@ -349,6 +364,8 @@ def main():
     parser = argparse.ArgumentParser(description='VocaAgent-2.0 数据库初始化')
     parser.add_argument('--import-excel', action='store_true',
                         help='从Excel导入岗位和行业数据（仅在首次部署时使用）')
+    parser.add_argument('--populate-skills', action='store_true',
+                        help='从岗位描述中提取技能关键词并填充 job_skill_requirements 表')
     args = parser.parse_args()
 
     print("=" * 50)
@@ -358,6 +375,12 @@ def main():
     if args.import_excel:
         print()
         import_excel_data()
+    if args.populate_skills:
+        print()
+        from utils.skill_analyzer import populate_job_skills
+        populate_job_skills()
+    if args.import_excel and not args.populate_skills:
+        print("\n[提示] 建议运行 python init_database.py --populate-skills 来提取岗位技能数据")
     print("\n[OK] 全部完成！")
 
 
