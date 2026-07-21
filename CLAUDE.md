@@ -34,8 +34,8 @@ Agent B (10岗位匹配分：id + 4维度分 + 综合分)  ← 轻量，必跑
 | Agent | 作用 | 百炼 APP_ID | 触发方式 |
 |-------|------|-------------|---------|
 | **A** | 简历→学生能力画像 JSON（基本信息 + 6维能力分 + 完整度/竞争力） | `APP_ID_A` | 用户上传简历 |
-| **B** | 画像→10岗位匹配分（只返回id + 5项维度分 + 综合分，瘦身快速） | `APP_ID_B` | Agent A 完成后自动 |
-| **C** | 单岗位详细画像（6维要求分 + 晋升 + 换岗），per student×job 缓存 | `APP_ID_C` | ① 用户点 JobDetail ② Agent D/E 自动串联 |
+| **B** | 画像→10岗位匹配分（规则引擎粗筛 Top10 + LLM 精排，只返回id + 5项维度分 + 综合分） | `APP_ID_B` | Agent A 完成后自动 |
+| **C** | 单岗位详细画像（规则引擎预计算技能差距 + LLM 生成 6维要求分 + 晋升 + 换岗），per student×job 缓存 | `APP_ID_C` | ① 用户点 JobDetail ② Agent D/E 自动串联 |
 | **D** | 画像 + 匹配分 → HTML 职业报告（内部自动串联 Agent C） | `APP_ID_D` | 用户点「生成报告」 |
 | **E** | 虚拟行业大佬 1v1 访谈（毒舌真诚风，多轮对话，摘要压缩） | `APP_ID_E` | 用户从 JobDetail/Report 进入访谈页 |
 
@@ -43,6 +43,8 @@ Agent B (10岗位匹配分：id + 4维度分 + 综合分)  ← 轻量，必跑
 
 ## 核心约束
 
+- **Agent B 规则引擎粗筛**：`select_top_jobs()` 基于 `job_skill_requirements` 表从全量岗位中选出 Top10，再交给 LLM 精排（减少 token 消耗）
+- **Agent C 技能差距预计算**：`analyze_skill_gap()` 比对 `skill_details` vs `job_skill_requirements`，生成 matched/insufficient/missing 三类分析，注入 LLM prompt
 - **Agent B 只输出匹配分**，不输出 6维要求分/晋升/换岗（瘦身，快速响应）
 - **Agent C 三重触发**：① 用户点击 JobDetail 时触发（前端）② Agent D 生成报告时自动触发（后端）③ Agent E 访谈时自动触发（后端）
 - **Agent C DB 缓存 per student×job**：`job_ai_profiles` 表，UNIQUE KEY `unique_student_job(student_id, job_id)`，不同学生同一岗位分析不同
@@ -67,6 +69,7 @@ Agent B (10岗位匹配分：id + 4维度分 + 综合分)  ← 轻量，必跑
 | 2026-06-20 | CLAUDE.md 重写 | `CLAUDE.md` | 4→5 Agent，10→12 表，补全 API 端点，新增修改日志/当前状态/编码约定 |
 | 2026-06-30 | 过时注释全面修复 | 8 个文件 | 3→5 Agent 计数修正：agent_orchestrator.py/settings.py/resume_parser.py/agentPipeline.ts/sse.ts/README.md/CLAUDE.md |
 | 2026-06-30 | Agent 路由拆分 | `routes/agent.py` → 6 个文件 | 1390 行拆为 agent_utils/a/b/c/d/e.py，URL 不变，13 Blueprint |
+| 2026-07-21 | 规则引擎 + 技能痛点 + Bug 修复 | `utils/skill_analyzer.py`, `routes/agent_b.py`, `routes/agent_c.py`, `routes/agent_d.py`, `routes/agent_e.py`, `routes/agent_utils.py`, `services/agent_orchestrator.py`, `frontend/src/views/JobDetail.vue`, `frontend/src/views/Matching.vue`, `frontend/src/views/Report.vue`, `CLAUDE.md` | 新增规则引擎粗筛 Top10 + 技能差距注入；match_rank 错位修复（JobDetail 直接用 job_id）；Agent C 加载态三步进度；Report 页排序/占位/按钮修复 |
 
 ## 编码约定 & Claude 规则
 
@@ -129,7 +132,8 @@ backend/
 └── utils/
     ├── db.py                       # 数据库连接池
     ├── auth.py                     # Token 认证 (get_current_user)
-    └── file_processor.py           # 文件类型检测 + 内容提取（PDF/Word/TXT）
+    ├── file_processor.py           # 文件类型检测 + 内容提取（PDF/Word/TXT）
+    └── skill_analyzer.py           # 规则引擎：技能差距分析 + Top N 岗位粗筛
 ```
 
 ## 前端结构
