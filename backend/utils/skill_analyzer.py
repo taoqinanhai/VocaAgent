@@ -226,11 +226,12 @@ def extract_skills_from_text(text: str) -> list[dict]:
     return result
 
 
-def populate_job_skills(batch_size: int = 500) -> int:
+def populate_job_skills(batch_size: int = 500, force: bool = False) -> int:
     """
-    遍历全量 jobs 表，提取每条岗位的技能要求，写入 job_skill_requirements。
+    从 jobs 表提取技能要求，写入 job_skill_requirements。
 
-    先清空旧数据，再批量 INSERT。
+    默认增量模式：只处理 jobs 表中尚未在 job_skill_requirements 里的新岗位。
+    force=True：清空旧数据，全量重建。
 
     Returns:
         写入的技能记录总数
@@ -238,15 +239,23 @@ def populate_job_skills(batch_size: int = 500) -> int:
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # 清空旧数据
-    cursor.execute("DELETE FROM job_skill_requirements")
-    print("[skill_analyzer] 已清空 job_skill_requirements 旧数据")
+    if force:
+        cursor.execute("DELETE FROM job_skill_requirements")
+        print("[skill_analyzer] force=True，已清空 job_skill_requirements 旧数据")
+        cursor.execute("SELECT id, job_description FROM jobs")
+    else:
+        cursor.execute("SELECT id, job_description FROM jobs WHERE id NOT IN (SELECT job_id FROM job_skill_requirements)")
 
-    # 取全部岗位
-    cursor.execute("SELECT id, job_description FROM jobs")
     jobs = cursor.fetchall()
+
+    if not jobs:
+        print("[skill_analyzer] 没有新岗位需要处理，跳过")
+        cursor.close()
+        conn.close()
+        return 0
+
     total_jobs = len(jobs)
-    print(f"[skill_analyzer] 共 {total_jobs} 条岗位，开始提取技能...")
+    print(f"[skill_analyzer] 共 {total_jobs} 条新岗位，开始提取技能...")
 
     total_skills = 0
     buffer = []

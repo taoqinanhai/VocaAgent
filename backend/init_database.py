@@ -294,7 +294,7 @@ def create_tables():
     conn.commit()
     cursor.close()
     conn.close()
-    print("\n[OK] 14 张表已就绪！")
+    print("\n[OK] 13 张表已就绪！")
 
 
 def import_excel_data():
@@ -365,7 +365,9 @@ def main():
     parser.add_argument('--import-excel', action='store_true',
                         help='从Excel导入岗位和行业数据（仅在首次部署时使用）')
     parser.add_argument('--populate-skills', action='store_true',
-                        help='从岗位描述中提取技能关键词并填充 job_skill_requirements 表')
+                        help='从岗位描述中提取技能关键词并填充 job_skill_requirements 表（增量模式，只处理新岗位）')
+    parser.add_argument('--force', action='store_true',
+                        help='配合 --populate-skills 使用：清空旧数据，全量重建')
     args = parser.parse_args()
 
     print("=" * 50)
@@ -378,9 +380,21 @@ def main():
     if args.populate_skills:
         print()
         from utils.skill_analyzer import populate_job_skills
-        populate_job_skills()
-    if args.import_excel and not args.populate_skills:
-        print("\n[提示] 建议运行 python init_database.py --populate-skills 来提取岗位技能数据")
+        populate_job_skills(force=args.force)
+    # 检查 job_skill_requirements 是否为空
+    if not args.populate_skills:
+        from utils.db import get_db_connection
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) AS cnt FROM job_skill_requirements")
+        if cursor.fetchone()['cnt'] == 0:
+            print("\n" + "=" * 50)
+            print("⚠  job_skill_requirements 表为空！")
+            print("   岗位匹配和技能差距分析将不可用。")
+            print("   请运行: python init_database.py --populate-skills")
+            print("=" * 50)
+        cursor.close()
+        conn.close()
     print("\n[OK] 全部完成！")
 
 
