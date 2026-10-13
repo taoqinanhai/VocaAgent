@@ -17,7 +17,6 @@ DB_CONFIG = {
     'password': os.getenv('DB_PASSWORD'),
     'database': os.getenv('DB_NAME', 'vocaagent'),
     'charset': 'utf8mb4',
-    'cursorclass': None,  # will be set to pymysql.cursors.DictCursor in db.py
 }
 
 

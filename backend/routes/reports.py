@@ -556,8 +556,8 @@ def _generate_pdf(title, student_name, content):
     for fp in font_paths:
         if _os_module.path.exists(fp):
             try:
-                pdf.add_font('CJK', '', fp)
-                pdf.add_font('CJK', 'B', fp)
+                pdf.add_font('CJK', '', fp, uni=True)
+                pdf.add_font('CJK', 'B', fp, uni=True)
                 font_name = 'CJK'
                 break
             except Exception:
@@ -713,7 +713,7 @@ def _generate_pdf(title, student_name, content):
     pdf.cell(0, 6, 'VocaAgent · AI 职业规划智能体', ln=True, align='C')
     pdf.cell(0, 5, '本报告由人工智能生成，仅供参考', ln=True, align='C')
 
-    return pdf.output()
+    return pdf.output(dest='S').encode('latin-1')
 
 
 @reports_bp.route('/api/reports/<int:report_id>/polish', methods=['POST'])
