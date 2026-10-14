@@ -57,6 +57,8 @@ D:\obsidian\VocaAgent-2.0\VocaAgent-2.0\
 | 2026-07-25 | 偏差修正 + Obsidian 知识库建立 | `init_database.py`, `CLAUDE.md`, Obsidian vault | "14 张表"→13；建立 7 份项目知识文档；CLAUDE.md 精简（详细内容迁移至 Obsidian） |
 | 2026-07-25 | populate_skills 增量模式 + 空表警告 | `utils/skill_analyzer.py`, `init_database.py` | `populate_job_skills()` 默认增量（--force 全量）；建库末尾检测空表并警告；Obsidian 笔记同步更新 |
 | 2026-08-03 | Conda 环境隔离 + 启动脚本 | `backend/run.ps1`, `CLAUDE.md`, Obsidian [[00-项目总览]] | 项目改为使用 Conda 环境 `vocaagent`，不依赖全局 Python；新增 `run.ps1` 启动脚本；Obsidian 笔记同步更新 |
+| 2026-10-13 | 第一批代码修复（26 项，P0–P3） | 22 个文件改动 + 3 个删除（逐条见桌面 `修复记录.md`） | 安全：密码改走请求体、改密码清 Token、3 处接口补归属校验、登出带 Token；数据：`skill_details` 落库、修正 `promotion_path` 读错、匹配写库加事务；稳定性：DBUtils 连接池、Agent A 不再回传简历原文省 token；清理：删 3 个无引用文件 |
+| 2026-10-14 | 第二批修复（7 项）+ 确定只跑本地 | `utils/db.py`, `utils/auth.py`, `routes/agent_b.py`, `utils/axios.ts`, 前端 4 个 view, `CLAUDE.md`, Obsidian [[02-数据库-Schema]] + [[05-已知坑点与注意事项]] | 连接池失败不再导致应用起不来；鉴权热路径泄漏、AI 字符串分数致整批匹配不落库、401 不跳登录页等修复；**云端部署废弃，今后仅本地运行**（`app.py` 绑 `127.0.0.1` 属正确改动）。Obsidian 补 `skill_details` 字段与 20–30 条坑点。已推送 GitHub `603f665` |
 
 ## 编码约定 & Claude 规则
 
@@ -105,4 +107,4 @@ mysql -u root -p vocaagent
 
 - `routes/reports.py` 1266 行，偏胖，后续可考虑拆分
 - `routes/chat.py` 系列端点标注"旧版兼容"，确认是否可以清理
-- 详见 Obsidian [[05-已知坑点与注意事项]]（15 条，按严重度分级）
+- 详见 Obsidian [[05-已知坑点与注意事项]]（30 条，按严重度分级；#20 起为 2026-10 修复批次新增）
