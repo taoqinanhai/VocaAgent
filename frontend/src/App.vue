@@ -168,18 +168,13 @@ const editProfileRules: FormRules = {
   name: [
     { required: true, message: '请输入姓名', trigger: 'blur' }
   ],
-  oldPassword: [
-    { required: true, message: '请输入原密码', trigger: 'blur' }
-  ],
   newPassword: [
-    { required: true, message: '请输入新密码', trigger: 'blur' },
     { min: 6, message: '密码长度不能少于6个字符', trigger: 'blur' }
   ],
   confirmPassword: [
-    { required: true, message: '请确认新密码', trigger: 'blur' },
     {
       validator: (rule, value, callback) => {
-        if (value !== editProfileForm.newPassword) {
+        if (editProfileForm.newPassword && value !== editProfileForm.newPassword) {
           callback(new Error('两次输入的密码不一致'))
         } else {
           callback()
@@ -237,7 +232,10 @@ const navigateToLogin = () => {
 
 const handleLogout = async () => {
   try {
-    await axios.post('/api/auth/logout')
+    // 带上 Token，服务端才能删除对应的 user_tokens 记录，真正使本次会话失效
+    await axios.post('/api/auth/logout', null, {
+      headers: { 'Authorization': `Bearer ${userStore.token}` }
+    })
     userStore.logout()
     ElMessage.success('退出登录成功')
     router.push('/login')

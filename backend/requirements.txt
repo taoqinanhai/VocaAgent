@@ -1,5 +1,6 @@
 Flask
 Flask-CORS
+DBUtils
 python-dotenv
 dashscope
 PyPDF2

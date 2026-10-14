@@ -149,14 +149,17 @@ def generate_report():
             "evaluation_mechanism": student.get('dynamic_evaluation_mechanism', '')
         }
 
+        # 用结构化内容兜底生成 HTML，避免前端 v-html 渲染空白
+        report_html = _build_legacy_report_html(report_content, student.get('name', ''))
         cursor.execute("""
             INSERT INTO career_reports
-            (student_id, user_id, report_content, created_at, updated_at)
-            VALUES (%s, %s, %s, %s, %s)
+            (student_id, user_id, report_content, report_html, created_at, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s)
         """, (
             student_id,
             user_id,
             json.dumps(report_content, ensure_ascii=False),
+            report_html,
             datetime.datetime.now(),
             datetime.datetime.now()
         ))
@@ -378,31 +381,19 @@ def export_report(report_id):
 @reports_bp.route('/api/reports/<int:report_id>/download', methods=['GET'])
 def download_report(report_id):
     """下载报告为HTML"""
-    print(f"\n=== 处理下载请求 ===")
-    print(f"报告ID: {report_id}")
-
     try:
-        print("1. 验证用户登录")
         current_user = get_current_user()
-        print(f"当前用户: {current_user}")
-
         if not current_user:
-            print("用户未登录")
             return jsonify({"error": "请先登录"}), 401
 
         user_id = current_user['id']
-        print(f"用户ID: {user_id}")
-
-        print("2. 连接数据库")
         conn = None
         cursor = None
 
         try:
             conn = get_db_connection()
-            print("数据库连接成功")
             cursor = conn.cursor()
 
-            print("3. 查询报告数据")
             cursor.execute("""
                 SELECT cr.report_html, cr.report_title, cr.report_content,
                        s.name as student_name
@@ -412,10 +403,8 @@ def download_report(report_id):
             """, (report_id, user_id))
 
             report = cursor.fetchone()
-            print(f"查询结果: report_id={report_id}")
 
             if not report:
-                print("报告不存在或无权限访问")
                 return jsonify({"error": "报告不存在或无权限访问"}), 404
 
             report_html = report.get('report_html') or ''
@@ -433,30 +422,22 @@ def download_report(report_id):
             if not report_html.strip():
                 report_html = _build_legacy_report_html(report_content, student_name)
 
-            print("4. 构建报告HTML")
             html_content = _wrap_report_html(report_html, report_title, student_name, report_date)
 
-            print("5. 生成响应")
             response = make_response(html_content)
             response.headers['Content-Type'] = 'text/html; charset=utf-8'
             safe_name = student_name.replace(' ', '_')
             filename = f"{safe_name}_{report_title}.html"
             response.headers['Content-Disposition'] = f"attachment; filename*=UTF-8''{quote(filename)}"
-            print("响应生成成功")
             return response
 
         finally:
             if cursor:
                 cursor.close()
-                print("数据库游标已关闭")
             if conn:
                 conn.close()
-                print("数据库连接已关闭")
 
     except Exception as e:
-        print(f"\n=== 下载报告失败 ===")
-        print(f"错误类型: {type(e).__name__}")
-        print(f"错误信息: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({"error": f"下载报告失败：{str(e)}"}), 500
@@ -552,16 +533,25 @@ def _generate_pdf(title, student_name, content):
         'C:/Windows/Fonts/simfang.ttf',
         'C:/Windows/Fonts/msyh.ttf',
         'C:/Windows/Fonts/STXIHEI.TTF',
+        # Linux / macOS 常见中文字体路径
+        '/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc',
+        '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
+        '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+        '/System/Library/Fonts/PingFang.ttc',
     ]
+    font_found = False
     for fp in font_paths:
         if _os_module.path.exists(fp):
             try:
                 pdf.add_font('CJK', '', fp, uni=True)
                 pdf.add_font('CJK', 'B', fp, uni=True)
                 font_name = 'CJK'
+                font_found = True
                 break
             except Exception:
                 continue
+    if not font_found:
+        print("[警告] 未找到中文字体，PDF 将回退到 Helvetica（中文可能乱码）")
 
     # ---- 封面 ----
     pdf.set_fill_color(30, 58, 95)   # 深蓝 #1e3a5f
@@ -806,7 +796,7 @@ def polish_report(report_id):
                         old_report['target_job_id'],
                         new_title,
                         json.dumps(content, ensure_ascii=False),
-                        old_report['report_html'] or '',  # 复用原 HTML（润色文字在 report_content 中）
+                        _build_legacy_report_html(content, content.get('student_name', '')),  # 用润色后的内容重新生成 HTML
                         user_id,
                         now,
                         now

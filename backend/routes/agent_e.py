@@ -8,6 +8,7 @@ import datetime
 from flask import Blueprint, request, jsonify, Response, stream_with_context
 from services.agent_orchestrator import orchestrator
 from utils.db import get_db_connection
+from utils.auth import get_current_user
 from utils.skill_analyzer import analyze_skill_gap, format_gap_for_prompt
 from .agent_utils import build_job_context, JOB_CONTEXT_COLUMNS
 
@@ -274,8 +275,19 @@ def get_interview_history(student_id, job_id):
     查询某学生对某岗位的历史对话记录
     """
     try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify({"error": "请先登录"}), 401
+
         conn = get_db_connection()
         cursor = conn.cursor()
+
+        # 越权校验：该学生必须属于当前登录用户
+        cursor.execute("SELECT id FROM students WHERE id = %s AND user_id = %s", (student_id, current_user['id']))
+        if not cursor.fetchone():
+            cursor.close()
+            conn.close()
+            return jsonify({"error": "无权限访问该访谈记录"}), 403
 
         cursor.execute("""
             SELECT id, student_id, job_id, messages, created_at, updated_at
@@ -315,8 +327,19 @@ def delete_interview_history(student_id, job_id):
     清空某学生对某岗位的对话历史（重新开始访谈）
     """
     try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify({"error": "请先登录"}), 401
+
         conn = get_db_connection()
         cursor = conn.cursor()
+
+        # 越权校验：该学生必须属于当前登录用户
+        cursor.execute("SELECT id FROM students WHERE id = %s AND user_id = %s", (student_id, current_user['id']))
+        if not cursor.fetchone():
+            cursor.close()
+            conn.close()
+            return jsonify({"error": "无权限删除该访谈记录"}), 403
 
         cursor.execute("""
             DELETE FROM interview_sessions

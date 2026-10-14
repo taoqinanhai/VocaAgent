@@ -715,6 +715,7 @@ const triggerAgentC = async () => {
   aiProfileLoading.value = true
   loadingStatus.value = '正在连接 AI 服务...'
   loadingStep.value = 0
+  let jobProfileWarning = ''   // DB 写入警告（避免"成功+警告"矛盾提示）
 
   // 获取学生画像
   let profile = agentPipeline.profile
@@ -788,6 +789,7 @@ const triggerAgentC = async () => {
             } else if (sseEvent.type === 'error') {
               throw new Error(sseEvent.message || 'AI 服务错误')
             } else if (sseEvent.type === 'done') {
+              jobProfileWarning = sseEvent.warning || ''
               if (sseEvent.warning) ElMessage.warning(sseEvent.warning)
             }
           } catch (e) {
@@ -812,7 +814,7 @@ const triggerAgentC = async () => {
     const parsed = JSON.parse(jsonStr) as JobAICacheData
     aiProfileExists.value = true
     applyAiProfileToJob(parsed)
-    ElMessage.success('AI 岗位画像生成完成')
+    if (!jobProfileWarning) ElMessage.success('AI 岗位画像生成完成')
   } catch (err: any) {
     ElMessage.error('AI 岗位画像生成失败：' + (err.message || '网络错误'))
   } finally {

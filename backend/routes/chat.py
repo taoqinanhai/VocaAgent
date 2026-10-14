@@ -173,7 +173,7 @@ def customer_service_chat():
         system_prompt = "你是一个专业的AI客服助手，负责回答用户关于大学生就业规划平台的各种问题。你的职责包括：\n1. 解答平台使用方法和功能相关的问题\n2. 提供职业规划相关的基本指导\n3. 帮助用户理解平台的各项服务\n4. 以友好、专业的态度与用户交流\n5. 对于复杂问题，引导用户使用平台的专业功能\n\n请保持回答简洁明了，直接针对用户问题给出有用的信息。"
 
         if not API_KEY1 or not APP_ID1:
-            return jsonify({"error": "客服智能体配置未完成，请检查API_KEY1和APP_ID1环境变量"}), 500
+            return jsonify({"response": "客服功能暂未开放，敬请期待。您可以先浏览岗位或使用其他功能。"}), 200
 
         call_params = {
             'api_key': API_KEY1,

@@ -170,7 +170,8 @@ def reset_password(user_id):
         if current_user['role'] != 'admin':
             return jsonify({"error": "权限不足"}), 403
 
-        new_password = request.args.get('new_password')
+        data = request.get_json(silent=True) or {}
+        new_password = data.get('new_password')
         if not new_password:
             return jsonify({"error": "新密码不能为空"}), 400
 

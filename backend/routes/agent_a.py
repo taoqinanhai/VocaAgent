@@ -77,7 +77,7 @@ def agent_profile():
             student_id = None
             db_warning = None
             try:
-                student_id, error = parse_and_save_resume_data(full_response, user_id)
+                student_id, error = parse_and_save_resume_data(full_response, user_id, resume_text)
                 if error:
                     db_warning = f"画像已生成但保存失败：{error}"
                     print(f"[Agent A] DB保存失败: {error}")

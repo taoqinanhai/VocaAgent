@@ -88,6 +88,8 @@ def login():
         token = generate_token()
         expires_at = generate_expiration_time()
 
+        # 清理该用户旧 Token，避免 user_tokens 表无限膨胀（每个用户只保留一个有效 Token）
+        cursor.execute("DELETE FROM user_tokens WHERE user_id = %s", (user['id'],))
         cursor.execute(
             "INSERT INTO user_tokens (user_id, token, expires_at) VALUES (%s, %s, %s)",
             (user['id'], token, expires_at)
@@ -204,33 +206,39 @@ def update_profile():
         if not name:
             return jsonify({"error": "姓名不能为空"}), 400
 
-        if not old_password:
-            return jsonify({"error": "原密码不能为空"}), 400
-
-        if not new_password:
-            return jsonify({"error": "新密码不能为空"}), 400
+        # 只有要改密码时才要求原密码（允许只改姓名不填密码）
+        if new_password and not old_password:
+            return jsonify({"error": "修改密码需要提供原密码"}), 400
 
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        cursor.execute("SELECT password FROM users WHERE id = %s", (current_user['id'],))
-        user = cursor.fetchone()
+        if new_password:
+            # 改密码：先验证原密码
+            cursor.execute("SELECT password FROM users WHERE id = %s", (current_user['id'],))
+            user = cursor.fetchone()
+            if not user:
+                cursor.close()
+                conn.close()
+                return jsonify({"error": "用户不存在"}), 404
+            if not verify_password(user['password'], old_password):
+                cursor.close()
+                conn.close()
+                return jsonify({"error": "原密码错误"}), 400
 
-        if not user:
-            cursor.close()
-            conn.close()
-            return jsonify({"error": "用户不存在"}), 404
-
-        if not verify_password(user['password'], old_password):
-            cursor.close()
-            conn.close()
-            return jsonify({"error": "原密码错误"}), 400
-
-        hashed_password = hash_password(new_password)
-        cursor.execute(
-            "UPDATE users SET name = %s, password = %s, updated_at = NOW() WHERE id = %s",
-            (name, hashed_password, current_user['id'])
-        )
+            hashed_password = hash_password(new_password)
+            cursor.execute(
+                "UPDATE users SET name = %s, password = %s, updated_at = NOW() WHERE id = %s",
+                (name, hashed_password, current_user['id'])
+            )
+            # 改密码后使该用户所有旧 Token 失效，防止账号被盗后攻击者 Token 仍可用
+            cursor.execute("DELETE FROM user_tokens WHERE user_id = %s", (current_user['id'],))
+        else:
+            # 只改姓名
+            cursor.execute(
+                "UPDATE users SET name = %s, updated_at = NOW() WHERE id = %s",
+                (name, current_user['id'])
+            )
         conn.commit()
         cursor.close()
         conn.close()

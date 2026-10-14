@@ -33,7 +33,13 @@ api.interceptors.response.use(
     if (error.response && error.response.status === 401) {
       const userStore = useUserStore()
       userStore.logout()
-      // 可以在这里添加重定向到登录页面的逻辑
+      // 跳回登录页。这里用 window.location 而不是 router.push：router 会引入各页面
+      // 组件、页面又反过来引入本文件，形成循环依赖。
+      // 场景：改密码后服务端会删掉该用户所有 Token，当前会话立即失效——
+      // 若不跳转，用户会停在原页面反复请求失败，看起来像"网站坏了"。
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(error)
   }

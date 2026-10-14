@@ -174,6 +174,7 @@ const streamingReport = ref(false)
 const streamingHtml = ref('')
 const currentStreamReportId = ref<number | null>(null)  // Agent D SSE 返回的 report_id，供导出PDF使用
 const reportStreamError = ref('')
+let reportWarning = ''                    // DB 写入警告（避免"成功+警告"矛盾提示）
 
 const reportForm = ref({
   studentId: null as number | null,
@@ -195,6 +196,7 @@ const pendingReportStudentId = ref<number | null>(null)
  * 核心：通过 fetch + SSE 调 Agent D 流式生成报告
  */
 const triggerAgentDStream = async (profile: Record<string, unknown>, top3: any[], targetJobId: number) => {
+  reportWarning = ''   // 每次运行重置：上次的警告不能残留到这次
   streamingReport.value = true
   reportStreamError.value = ''
   streamingHtml.value = ''
@@ -252,6 +254,7 @@ const triggerAgentDStream = async (profile: Record<string, unknown>, top3: any[]
               throw new Error(event.message || 'AI 服务错误')
             } else if (event.type === 'done') {
               // DB 持久化结果通知
+              reportWarning = event.warning || ''
               if (event.warning) {
                 console.warn('[Report] DB 写入警告:', event.warning)
                 ElMessage.warning(event.warning)
@@ -263,7 +266,7 @@ const triggerAgentDStream = async (profile: Record<string, unknown>, top3: any[]
               // ★ 显式关闭加载状态，不依赖 finally
               streamingReport.value = false
               agentPipeline.reportHtml = streamingHtml.value
-              ElMessage.success('职业报告生成完成！')
+              if (!reportWarning) ElMessage.success('职业报告生成完成！')
               return
             }
           } catch (e) {

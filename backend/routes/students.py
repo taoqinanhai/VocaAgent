@@ -194,6 +194,13 @@ def get_student_profile(student_id):
             except:
                 professional_skills = []
 
+        skill_details = []
+        if student.get('skill_details'):
+            try:
+                skill_details = json.loads(student['skill_details']) if isinstance(student['skill_details'], str) else student['skill_details']
+            except:
+                skill_details = []
+
         certificates = []
         if student.get('certificates'):
             try:
@@ -261,6 +268,7 @@ def get_student_profile(student_id):
                 "profile_completeness": student.get('profile_completeness', 0),
                 "competitiveness_score": student.get('competitiveness_score', 0)
             },
+            "skill_details": skill_details,
             "resume_text": student.get('resume_text', ''),
             "created_at": student.get('created_at'),
             "updated_at": student.get('updated_at')

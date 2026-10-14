@@ -270,7 +270,7 @@ const fetchUsers = async () => {
     users.value = response.data.data
     originalUsers.value = response.data.data
   } catch (error: any) {
-    ElMessage.error(error.response?.data?.detail || '获取用户列表失败')
+    ElMessage.error(error.response?.data?.error || '获取用户列表失败')
   } finally {
     loading.value = false
   }
@@ -303,7 +303,7 @@ const handleCreate = async () => {
         resetCreateForm()
         fetchUsers()
       } catch (error: any) {
-        ElMessage.error(error.response?.data?.detail || '创建用户失败')
+        ElMessage.error(error.response?.data?.error || '创建用户失败')
       } finally {
         loading.value = false
       }
@@ -335,7 +335,7 @@ const handleUpdate = async () => {
         resetEditForm()
         fetchUsers()
       } catch (error: any) {
-        ElMessage.error(error.response?.data?.detail || '更新用户失败')
+        ElMessage.error(error.response?.data?.error || '更新用户失败')
       } finally {
         loading.value = false
       }
@@ -364,13 +364,12 @@ const handleResetPassword = async (row: User) => {
 
     loading.value = true
     try {
-      await axios.put(`/api/admin/users/${row.id}/password`, null, {
-        headers: { 'Authorization': `Bearer ${getToken()}` },
-        params: { token: getToken(), new_password: newPassword }
+      await axios.put(`/api/admin/users/${row.id}/password`, { new_password: newPassword }, {
+        headers: { 'Authorization': `Bearer ${getToken()}` }
       })
       ElMessage.success('密码重置成功')
     } catch (error: any) {
-      ElMessage.error(error.response?.data?.detail || '重置密码失败')
+      ElMessage.error(error.response?.data?.error || '重置密码失败')
     } finally {
       loading.value = false
     }
@@ -402,7 +401,7 @@ const handleDelete = async (row: User) => {
       ElMessage.success('用户已成功删除')
       fetchUsers()
     } catch (error: any) {
-      ElMessage.error(error.response?.data?.detail || '删除用户失败')
+      ElMessage.error(error.response?.data?.error || '删除用户失败')
     } finally {
       loading.value = false
     }

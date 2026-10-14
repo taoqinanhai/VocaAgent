@@ -18,7 +18,7 @@ def get_jobs():
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        query = "SELECT * FROM jobs LIMIT %s OFFSET %s"
+        query = "SELECT * FROM jobs ORDER BY id LIMIT %s OFFSET %s"
         cursor.execute(query, (limit, skip))
         jobs = cursor.fetchall()
 
@@ -35,7 +35,7 @@ def get_jobs():
             vertical_promotion_info = None
             if job.get('promotion_path'):
                 try:
-                    vertical_promotion_info = json.loads(job['complete_promotion_path']) if isinstance(job['complete_promotion_path'], str) else job['complete_promotion_path']
+                    vertical_promotion_info = json.loads(job['promotion_path']) if isinstance(job['promotion_path'], str) else job['promotion_path']
                 except:
                     vertical_promotion_info = []
 

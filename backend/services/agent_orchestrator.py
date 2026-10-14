@@ -124,7 +124,7 @@ SYSTEM_PROMPT_B = """你是一个专业的岗位匹配专家。你会收到一�
 
 ## 输出格式（严格 JSON）
 
-你必须输出以下结构，**恰好 10 个岗位**，每个岗位仅包含匹配度评分。不得添加额外字段：
+你必须为下方提供的每一个岗位输出匹配度评分，不得添加额外字段：
 
 ```json
 {
@@ -481,8 +481,7 @@ Required JSON format:
     "professional_skills": ["技能1", "技能2"],
     "certificates": ["证书1", "证书2"],
     "internship_experience_detail": [{{"company": "公司名", "position": "职位", "duration": "时间段", "description": "工作描述"}}],
-    "project_experience": [{{"name": "项目名", "role": "角色", "description": "项目描述"}}],
-    "resume_text": "简历原始文本全文"
+    "project_experience": [{{"name": "项目名", "role": "角色", "description": "项目描述"}}]
   }},
   "ability_dimension_scores": {{
     "professional_skills_certificates": 7.5,

@@ -343,6 +343,7 @@ const streamingText = ref('')            // 实时累积的流式文本
 const streamingAbort = ref<(() => void) | null>(null)  // 中断函数
 const profileGenerated = ref(false)      // 画像是否刚生成完成（用于显示跳转按钮）
 let fullResponse = ''                    // 非响应式的完整累积文本
+let profileWarning = ''                  // DB 写入警告（避免"成功+警告"矛盾提示）
 
 const commonSkills = [
   'Java', 'Python', 'JavaScript', 'Vue.js', 'React', 'Node.js',
@@ -480,6 +481,7 @@ const handleDrop = async (event: DragEvent) => {
  * 支持文件（FormData）和纯文本（JSON）两种输入
  */
 const startProfileStream = async (payload: { file?: File; resume_text?: string }) => {
+  profileWarning = ''   // 每次运行重置：上次的警告不能残留到这次
   const token = localStorage.getItem('token')
   const headers: Record<string, string> = { Accept: 'text/event-stream' }
   if (token) headers['Authorization'] = `Bearer ${token}`
@@ -542,6 +544,7 @@ const startProfileStream = async (payload: { file?: File; resume_text?: string }
                 console.log('[Profile] student_id captured:', event.student_id)
               }
               // 显示 DB 写入警告（如果有）
+              profileWarning = event.warning || ''
               if (event.warning) {
                 console.warn('[Profile] DB 写入警告:', event.warning)
                 ElMessage.warning(event.warning)
@@ -576,7 +579,7 @@ const parseResume = async (file: File) => {
   try {
     fullResponse = await startProfileStream({ file })
     handleProfileComplete(fullResponse)
-    ElMessage.success('简历解析成功！')
+    if (!profileWarning) ElMessage.success('简历解析成功！')
     await loadStudentsList()
   } catch (error: any) {
     ElMessage.error('AI 解析失败：' + (error.message || '网络连接失败'))
@@ -675,7 +678,7 @@ const submitManualInput = async () => {
   try {
     fullResponse = await startProfileStream({ resume_text: manualInput.value })
     handleProfileComplete(fullResponse)
-    ElMessage.success('画像生成成功！')
+    if (!profileWarning) ElMessage.success('画像生成成功！')
     await loadStudentsList()
     manualInput.value = ''
   } catch (error: any) {

@@ -94,7 +94,7 @@ def save_student_profile(profile_data, user_id=1):
         INSERT INTO students (
             user_id, student_id,
             name, email, phone, education, school, major, graduation_year,
-            professional_skills, certificates,
+            professional_skills, skill_details, certificates,
             professional_skills_certificates,
             innovation_ability,
             learning_ability,
@@ -110,7 +110,7 @@ def save_student_profile(profile_data, user_id=1):
             created_at, updated_at
         ) VALUES (
             %s, %s, %s, %s, %s, %s, %s, %s, %s,
-            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
         )
         """
 
@@ -126,6 +126,7 @@ def save_student_profile(profile_data, user_id=1):
             safe_int(resume_detail.get("graduation_year")),
 
             json.dumps(resume_detail.get("professional_skills", []), ensure_ascii=False),
+            json.dumps(profile_data.get("skill_details", []), ensure_ascii=False),
             json.dumps(resume_detail.get("certificates", []), ensure_ascii=False),
 
             safe_float(ability_dim.get("professional_skills_certificates", 0)),
@@ -164,7 +165,7 @@ def save_student_profile(profile_data, user_id=1):
         return None, f"保存失败：{str(e)}"
 
 
-def parse_and_save_resume_data(ai_response_text, user_id=1):
+def parse_and_save_resume_data(ai_response_text, user_id=1, resume_text=None):
     """
     兼容旧接口：解析 Agent A 响应 → 存入数据库
     返回 (student_id, error_message)
@@ -174,5 +175,9 @@ def parse_and_save_resume_data(ai_response_text, user_id=1):
     if error:
         return None, error
 
-    # 2. 存入数据库
+    # 2. AI 不再回传 resume_text（省 token），由调用方传入原始简历文本补上
+    if resume_text and data:
+        data.setdefault('resume_detail_info', {})['resume_text'] = resume_text
+
+    # 3. 存入数据库
     return save_student_profile(data, user_id)

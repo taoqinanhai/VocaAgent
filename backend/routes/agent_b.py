@@ -13,6 +13,23 @@ from .agent_utils import _extract_json, build_job_context, JOB_CONTEXT_COLUMNS
 agent_b_bp = Blueprint('agent_b', __name__)
 
 
+def _to_float(value, default=0.0):
+    """把 AI 返回的分数字段安全转成 float。
+
+    AI 可能返回字符串（"85" / "85%"）甚至 null。直接用会在排序时抛
+    TypeError: '<' not supported between 'str' and 'int'，导致整批匹配结果
+    一条都不落库；写库时也会因类型不符失败。这里统一兜底。
+    """
+    if isinstance(value, bool):  # bool 是 int 子类，单独挡掉
+        return default
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        return float(str(value).strip().rstrip('%'))
+    except (TypeError, ValueError):
+        return default
+
+
 @agent_b_bp.route('/api/agent/match', methods=['POST'])
 def agent_match():
     """
@@ -123,41 +140,62 @@ def agent_match():
                     job_profiles = parsed.get('job_post_profiles', []) if parsed else []
 
                     if job_profiles:
-                        conn3 = get_db_connection()
-                        cur3 = conn3.cursor()
-
-                        cur3.execute(
-                            "DELETE FROM student_job_matches WHERE student_id = %s",
-                            (student_id,)
+                        # 写库前按综合匹配分降序排序，保证 match_rank 与分数顺序一致
+                        # （分数可能被 AI 返回成字符串，用 _to_float 兜底，否则 TypeError
+                        #   会让整批结果不落库）
+                        job_profiles = sorted(
+                            job_profiles,
+                            key=lambda j: _to_float(j.get('user_matching_scores', {}).get('overall_matching', 0)),
+                            reverse=True
                         )
 
-                        for rank, job in enumerate(job_profiles, start=1):
-                            matching = job.get('user_matching_scores', {})
-                            cur3.execute("""
-                                INSERT INTO student_job_matches
-                                (job_id, student_id, match_rank,
-                                 basic_requirements_matching, professional_skills_matching,
-                                 professional_literacy_matching, development_potential_matching,
-                                 overall_matching, created_at, updated_at)
-                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                            """, (
-                                job.get('id'),
-                                student_id,
-                                rank,
-                                matching.get('basic_requirements_matching', 0),
-                                matching.get('professional_skills_matching', 0),
-                                matching.get('professional_literacy_matching', 0),
-                                matching.get('development_potential_matching', 0),
-                                matching.get('overall_matching', 0),
-                                datetime.datetime.now(),
-                                datetime.datetime.now()
-                            ))
-                            match_count += 1
+                        conn3 = get_db_connection()
+                        cur3 = conn3.cursor()
+                        saved = False
 
-                        conn3.commit()
-                        cur3.close()
-                        conn3.close()
-                        print(f"[Agent B] 匹配结果已保存, student_id={student_id}, count={match_count}")
+                        try:
+                            cur3.execute(
+                                "DELETE FROM student_job_matches WHERE student_id = %s",
+                                (student_id,)
+                            )
+
+                            for rank, job in enumerate(job_profiles, start=1):
+                                matching = job.get('user_matching_scores', {})
+                                cur3.execute("""
+                                    INSERT INTO student_job_matches
+                                    (job_id, student_id, match_rank,
+                                     basic_requirements_matching, professional_skills_matching,
+                                     professional_literacy_matching, development_potential_matching,
+                                     overall_matching, created_at, updated_at)
+                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                """, (
+                                    job.get('id'),
+                                    student_id,
+                                    rank,
+                                    _to_float(matching.get('basic_requirements_matching', 0)),
+                                    _to_float(matching.get('professional_skills_matching', 0)),
+                                    _to_float(matching.get('professional_literacy_matching', 0)),
+                                    _to_float(matching.get('development_potential_matching', 0)),
+                                    _to_float(matching.get('overall_matching', 0)),
+                                    datetime.datetime.now(),
+                                    datetime.datetime.now()
+                                ))
+                                match_count += 1
+
+                            conn3.commit()
+                            saved = True
+                        except Exception as e:
+                            conn3.rollback()
+                            match_count = 0  # 已回滚，不能再对外报"已保存 N 条"
+                            db_warning = f"匹配结果保存失败：{str(e)}"
+                            print(f"[Agent B] 匹配结果保存失败: {e}")
+                        finally:
+                            cur3.close()
+                            conn3.close()
+
+                        # 只在真正 commit 成功后打印，避免回滚了还打"已保存"
+                        if saved:
+                            print(f"[Agent B] 匹配结果已保存, student_id={student_id}, count={match_count}")
                     else:
                         db_warning = "Agent B 返回数据无 job_post_profiles，无法保存匹配结果"
                 else:

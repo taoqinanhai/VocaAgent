@@ -36,8 +36,8 @@
           </el-col>
           <el-col :span="8">
             <div class="stat-card glass-tile">
-              <div class="stat-number">80%+</div>
-              <div class="stat-label">匹配准确率</div>
+              <div class="stat-number">5</div>
+              <div class="stat-label">AI Agent 流水线</div>
             </div>
           </el-col>
         </el-row>

@@ -357,6 +357,7 @@ const streamProgress = ref('')            // 进度提示文本
 const streamJobCount = ref(0)             // 已解析的岗位数
 const streamPhase = ref<'idle' | 'connecting' | 'streaming' | 'done'>('idle')
 const hasCheckedDb = ref(false)           // 是否已查过 DB（避免重复弹窗）
+let matchWarning = ''                     // DB 写入警告（避免"成功+警告"矛盾提示）
 
 
 // 按匹配度从高到低排序的匹配结果
@@ -467,6 +468,7 @@ const startStreamMatching = async (profileData: Record<string, unknown>) => {
   streamJobCount.value = 0
   streamProgress.value = 'AI 正在分析您的能力画像...'
   matchResults.value = []
+  matchWarning = ''   // 每次运行重置：上次的警告不能残留到这次
 
   const token = localStorage.getItem('token')
   const headers: Record<string, string> = {
@@ -521,6 +523,7 @@ const startStreamMatching = async (profileData: Record<string, unknown>) => {
               fullText += sseEvent.content   // ★ 只累积 AI 输出的内容
             } else if (sseEvent.type === 'done') {
               // DB 持久化结果通知
+              matchWarning = sseEvent.warning || ''
               if (sseEvent.warning) {
                 console.warn('[Matching] DB 写入警告:', sseEvent.warning)
                 ElMessage.warning(sseEvent.warning)
@@ -615,7 +618,7 @@ const startStreamMatching = async (profileData: Record<string, unknown>) => {
 
     streamPhase.value = 'done'
     streamProgress.value = `匹配完成，共 ${matchResults.value.length} 个岗位`
-    ElMessage.success(`匹配完成！已为您找到 ${matchResults.value.length} 个匹配岗位`)
+    if (!matchWarning) ElMessage.success(`匹配完成！已为您找到 ${matchResults.value.length} 个匹配岗位`)
   } catch (err: any) {
     ElMessage.error('匹配失败：' + (err.message || '网络错误'))
     streamPhase.value = 'idle'

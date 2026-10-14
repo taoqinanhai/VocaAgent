@@ -34,6 +34,9 @@ backend/uploads/
 # 日志
 *.log
 
+# 内部文档（个人修复记录，不随代码发布）
+修复记录.md
+
 # OS
 .DS_Store
 Thumbs.db

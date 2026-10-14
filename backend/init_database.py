@@ -72,6 +72,7 @@ def create_tables():
             major VARCHAR(200),
             graduation_year INT,
             professional_skills JSON,
+            skill_details JSON,
             certificates JSON,
             professional_skills_certificates FLOAT,
             innovation_ability FLOAT,

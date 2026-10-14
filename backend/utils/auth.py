@@ -30,6 +30,8 @@ def generate_expiration_time(hours=24):
 
 def verify_token(token):
     """验证Token"""
+    conn = None
+    cursor = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -39,9 +41,6 @@ def verify_token(token):
             (token,)
         )
         token_data = cursor.fetchone()
-
-        cursor.close()
-        conn.close()
 
         if not token_data:
             return None
@@ -53,10 +52,29 @@ def verify_token(token):
     except Exception as e:
         print(f"Token验证失败: {str(e)}")
         return None
+    finally:
+        # 异常路径也必须归还连接：连接池 blocking=True，泄漏会把池耗尽并让后续请求阻塞
+        _close_quietly(cursor, conn)
+
+
+def _close_quietly(cursor, conn):
+    """尽力关闭游标与连接，忽略关闭过程中的异常（连接已断时 close 本身也会抛）"""
+    if cursor:
+        try:
+            cursor.close()
+        except Exception:
+            pass
+    if conn:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 def get_current_user():
     """获取当前登录用户"""
+    conn = None
+    cursor = None
     try:
         auth_header = request.headers.get('Authorization', '')
         token = auth_header.replace('Bearer ', '') if auth_header.startswith('Bearer ') else None
@@ -74,10 +92,10 @@ def get_current_user():
         cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
         user = cursor.fetchone()
 
-        cursor.close()
-        conn.close()
-
         return user
     except Exception as e:
         print(f"获取当前用户失败: {str(e)}")
         return None
+    finally:
+        # 同上：异常路径不归还连接会导致连接池耗尽
+        _close_quietly(cursor, conn)
